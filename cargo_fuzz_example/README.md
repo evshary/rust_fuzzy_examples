@@ -94,4 +94,17 @@ Show line-by-line coverage for the example library:
   src/lib.rs
 ```
 
+Generate an HTML coverage report:
+
+```bash
+"$LLVM_BIN"/llvm-cov show \
+  target/x86_64-unknown-linux-gnu/coverage/x86_64-unknown-linux-gnu/release/parse_port \
+  --instr-profile fuzz/coverage/parse_port/coverage.profdata \
+  --format=html \
+  --output-dir fuzz/coverage/parse_port/html \
+  src/lib.rs
+```
+
+Open `fuzz/coverage/parse_port/html/index.html` in a browser to view the report.
+
 Note: using the default sanitizer for `cargo fuzz coverage` failed in this environment with a LeakSanitizer error during corpus merge, while `--sanitizer none` completed successfully.
