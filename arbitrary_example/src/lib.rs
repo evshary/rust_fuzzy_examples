@@ -4,36 +4,36 @@ use arbitrary::{Arbitrary, Result, Unstructured};
 // In real fuzzing, a fuzzer would mutate bytes first, then `arbitrary`
 // would decode those bytes into a structured Rust value like this.
 #[derive(Debug, Arbitrary, PartialEq, Eq)]
-pub struct PortInput {
+pub struct EndpointInput {
+    pub ip: [u8; 4],
     pub port: u16,
-    pub padded: bool,
 }
 
 // Turn the structured input back into the string form our parser expects.
-pub fn render_port_input(input: &PortInput) -> String {
-    if input.padded {
-        format!(" {} ", input.port)
-    } else {
-        input.port.to_string()
-    }
+pub fn render_endpoint(input: &EndpointInput) -> String {
+    let [a, b, c, d] = input.ip;
+    format!("{a}.{b}.{c}.{d}:{}", input.port)
 }
 
-pub fn parse_port_text(text: &str) -> u16 {
-    let trimmed = text.trim();
+// The target cares only about the port portion of the endpoint.
+pub fn parse_port_from_endpoint(endpoint: &str) -> u16 {
+    let Some((_, port_text)) = endpoint.rsplit_once(':') else {
+        return 0;
+    };
 
-    if trimmed == "0" {
+    if port_text == "0" {
         panic!("bug: port 0 is handled incorrectly");
     }
 
-    trimmed.parse::<u16>().unwrap_or_default()
+    port_text.parse::<u16>().unwrap_or_default()
 }
 
 // `Unstructured` is the core `arbitrary` API. It wraps raw bytes and lets
 // us ask for typed values from them with `input.arbitrary::<T>()`.
 pub fn parse_port_from_bytes(data: &[u8]) -> Result<u16> {
     let mut input = Unstructured::new(data);
-    let port_input: PortInput = input.arbitrary()?;
-    Ok(parse_port_text(&render_port_input(&port_input)))
+    let endpoint: EndpointInput = input.arbitrary()?;
+    Ok(parse_port_from_endpoint(&render_endpoint(&endpoint)))
 }
 
 #[cfg(test)]
@@ -41,21 +41,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_numeric_ports() {
-        assert_eq!(parse_port_text("8080"), 8080);
+    fn parses_port_from_endpoint() {
+        assert_eq!(parse_port_from_endpoint("192.168.1.10:8080"), 8080);
     }
 
     #[test]
-    fn invalid_input_falls_back_to_zero() {
-        assert_eq!(parse_port_text("not a number"), 0);
+    fn ignores_the_ip_portion() {
+        assert_eq!(parse_port_from_endpoint("not-an-ip:8080"), 8080);
+    }
+
+    #[test]
+    fn invalid_port_falls_back_to_zero() {
+        assert_eq!(parse_port_from_endpoint("127.0.0.1:not-a-port"), 0);
+    }
+
+    #[test]
+    fn renders_a_structured_endpoint() {
+        let input = EndpointInput {
+            ip: [192, 168, 1, 10],
+            port: 8080,
+        };
+
+        assert_eq!(render_endpoint(&input), "192.168.1.10:8080");
     }
 
     #[test]
     fn arbitrary_can_build_a_structured_input() {
         let mut input = Unstructured::new(&[1; 32]);
         // Request one typed value from the byte buffer.
-        let port_input = input.arbitrary::<PortInput>().unwrap();
-        let rendered = render_port_input(&port_input);
+        let endpoint = input.arbitrary::<EndpointInput>().unwrap();
+        let rendered = render_endpoint(&endpoint);
 
         assert!(!rendered.is_empty());
     }

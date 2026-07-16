@@ -1,13 +1,14 @@
-use arbitrary_example::{PortInput, parse_port_text, render_port_input};
+use arbitrary_example::{parse_port_from_endpoint, render_endpoint, EndpointInput};
 
 fn main() {
-    let input = PortInput {
+    let input = EndpointInput {
+        ip: [192, 168, 1, 10],
         port: 8080,
-        padded: false,
     };
-    let text = render_port_input(&input);
-    let port = parse_port_text(&text);
+    let endpoint = render_endpoint(&input);
+    let port = parse_port_from_endpoint(&endpoint);
 
     println!("Generated input: {input:?}");
+    println!("Rendered endpoint: {endpoint}");
     println!("Parsed port: {port}");
 }
